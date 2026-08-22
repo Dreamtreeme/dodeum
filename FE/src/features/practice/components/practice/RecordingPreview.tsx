@@ -12,6 +12,14 @@ interface RecordingPreviewProps {
 
 type GuidanceLevel = "idle" | "aligning" | "almost" | "ok";
 
+const FACE_GUIDANCE_THRESHOLDS = {
+  centerPct: 25,
+  scaleMin: 12,
+  scaleMax: 75,
+  angle: 30,
+  stableFrames: 3,
+} as const;
+
 const RecordingPreview: React.FC<RecordingPreviewProps> = ({
   recordingState,
 
@@ -34,15 +42,6 @@ const RecordingPreview: React.FC<RecordingPreviewProps> = ({
 
   // 가이드라인 크기 (비디오 컨테이너 크기에 비례)
   const [guideSize, setGuideSize] = useState<number>(0);
-
-  // 임계치 (완화된 기준)
-  const T = {
-    centerPct: 25,     // 중앙 오차 허용 범위 (%) - 중앙에서 많이 벗어나도 OK
-    scaleMin: 12,      // 최소 얼굴 크기 (화면 높이의 12%) - 매우 멀리서도 OK
-    scaleMax: 75,      // 최대 얼굴 크기 (화면 높이의 75%) - 매우 가까이서도 OK
-    angle: 30,         // 고개 기울임 허용 각도 (도) - 많이 기울여도 OK
-    stableFrames: 3,   // 안정 상태 유지 프레임 수 - 매우 빨리 초록색으로 전환
-  };
 
   const stableCount = useRef(0);
 
@@ -154,12 +153,13 @@ const RecordingPreview: React.FC<RecordingPreviewProps> = ({
                 const dy = leftEye.y - rightEye.y;
                 const dx = leftEye.x - rightEye.x;
                 const rollDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-                okAngles = Math.abs(rollDeg) <= T.angle;
+                okAngles = Math.abs(rollDeg) <= FACE_GUIDANCE_THRESHOLDS.angle;
               }
 
-              const okCenter = centerErrPct <= T.centerPct;
+              const okCenter = centerErrPct <= FACE_GUIDANCE_THRESHOLDS.centerPct;
               const okScale =
-                faceScalePct >= T.scaleMin && faceScalePct <= T.scaleMax;
+                faceScalePct >= FACE_GUIDANCE_THRESHOLDS.scaleMin &&
+                faceScalePct <= FACE_GUIDANCE_THRESHOLDS.scaleMax;
               const allOk = okCenter && okScale && okAngles;
 
               // 녹화 중 표시용: 즉시 상태 반영
@@ -179,7 +179,8 @@ const RecordingPreview: React.FC<RecordingPreviewProps> = ({
                       : undefined;
               }
 
-              const isStable = stableCount.current >= T.stableFrames;
+              const isStable =
+                stableCount.current >= FACE_GUIDANCE_THRESHOLDS.stableFrames;
               nextLevel = allOk ? (isStable ? "ok" : "almost") : "aligning";
             }
           } else if (faces.length > 1) {
@@ -197,7 +198,7 @@ const RecordingPreview: React.FC<RecordingPreviewProps> = ({
           setReason(nextReason);
           setInRange(nextInRange);
         }
-      } catch (e) {
+      } catch {
         // 탐지 실패 시: 기본 안전 상태 유지
         setInRange(false);
       }
