@@ -23,22 +23,22 @@
 
 브라우저 오디오 입력, 실시간 음량 그래프, 그래프 이미지 캡처, multipart 업로드를 하나의 훈련 흐름으로 연결했습니다. 공통 동작은 재사용하고 각 훈련의 진행 방식만 분리해 5가지 발성 훈련을 구현했습니다.
 
-- 관련 커밋: [`f2ef0ac`](https://github.com/Dreamtreeme/https-github.com-dodeum-speech-therapy/commit/f2ef0ac0ade6b8aee2dce831b19258d1a3cc37db)
+- 관련 커밋: [`f2ef0ac`](https://github.com/Dreamtreeme/dodeum/commit/f2ef0ac0ade6b8aee2dce831b19258d1a3cc37db)
 - 데이터 계약: [`FE/src/features/voice-training/api/SUBMISSION_FORMAT.md`](./FE/src/features/voice-training/api/SUBMISSION_FORMAT.md)
 
 ### 브라우저 녹음과 Praat 입력 형식 연결
 
 기존 구현은 WebM 데이터를 `.wav` 파일명으로만 바꿔 전송해 Praat 분석 결과가 `null`로 반환됐습니다. RecordRTC로 실제 WAV 데이터를 생성하고 모노·16kHz 형식으로 맞춰 브라우저 녹음부터 서버 분석까지 이어지는 입력 계약을 수정했습니다.
 
-- 관련 커밋: [`4ba04de`](https://github.com/Dreamtreeme/https-github.com-dodeum-speech-therapy/commit/4ba04def41085a72ef37fce9ccd416167a9884c0)
+- 관련 커밋: [`4ba04de`](https://github.com/Dreamtreeme/dodeum/commit/4ba04def41085a72ef37fce9ccd416167a9884c0)
 
 ### 프론트엔드 구조와 API 호출 통일
 
 화면 단위로 흩어진 코드를 9개 기능 영역으로 재구성하고, 16개 기능 API 모듈이 공통 Axios 클라이언트를 사용하도록 정리했습니다. 인증 토큰 갱신과 오류 처리를 한곳에서 관리해 기능마다 중복되던 요청 코드를 줄였습니다.
 
-- 구조 개편: [`b5bef03`](https://github.com/Dreamtreeme/https-github.com-dodeum-speech-therapy/commit/b5bef03c950e486f344326e9fa4ad395bf302e02)
-- API 통일: [`4281e15`](https://github.com/Dreamtreeme/https-github.com-dodeum-speech-therapy/commit/4281e15196812fec8eb07f74367b3fca62e2574b)
-- 인증 흐름: [`0d02925`](https://github.com/Dreamtreeme/https-github.com-dodeum-speech-therapy/commit/0d02925666c99762a78429b38fca868a246d4ffe)
+- 구조 개편: [`b5bef03`](https://github.com/Dreamtreeme/dodeum/commit/b5bef03c950e486f344326e9fa4ad395bf302e02)
+- API 통일: [`4281e15`](https://github.com/Dreamtreeme/dodeum/commit/4281e15196812fec8eb07f74367b3fca62e2574b)
+- 인증 흐름: [`0d02925`](https://github.com/Dreamtreeme/dodeum/commit/0d02925666c99762a78429b38fca868a246d4ffe)
 
 ### 협업 과정에서 범위 조정
 
