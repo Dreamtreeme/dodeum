@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 class Settings(BaseSettings):
     PROJECT_NAME: str = "serving-server"
     DEBUG: bool = False
+    PORT: int = 8000
 
     # ---------- GCP ----------
     GCP_PROJECT_ID: str

@@ -78,7 +78,7 @@ npm install
 npm run dev
 ```
 
-기본 API 주소는 `http://localhost:8000/api/v1`입니다. 녹음·분석·기록 저장의 전체 흐름을 확인하려면 FastAPI, PostgreSQL, Google Cloud Storage, GPU 추론 서버를 추가로 설정해야 합니다. 전체 배포 환경은 [`exec/MANUAL.md`](./exec/MANUAL.md)에 정리돼 있습니다.
+기본 API 주소는 `http://localhost:8000/api/v1`입니다. 녹음·분석·기록 저장의 전체 흐름을 확인하려면 FastAPI, PostgreSQL, Google Cloud Storage, GPU 추론 서버를 추가로 설정해야 합니다. 전체 배포 환경은 [`exec/MANUAL.MD`](./exec/MANUAL.MD)에 정리돼 있습니다.
 
 ## 검증과 제한사항
 

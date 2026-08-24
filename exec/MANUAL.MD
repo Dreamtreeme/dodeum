@@ -1,4 +1,4 @@
-![image](image.png)
+![돋음 서비스 이미지](../FE/public/도드미_안경.png)
 
 # 돋음 포팅 매뉴얼
 

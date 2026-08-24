@@ -23,9 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Documentation files with dates
-2025-*
-
 # Environment variables
 .env
 .env.local

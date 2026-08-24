@@ -8,7 +8,7 @@ from api.core.logger import logger, log_success, log_error
 import os
 
 # 포트에 따라 다른 라우터 로드
-PORT = int(os.environ.get("PORT", 8000))
+PORT = settings.PORT
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

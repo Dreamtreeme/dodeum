@@ -1,458 +1,109 @@
-# AI Serving Server - Lip Sync Service (GPU Optimized)
+# 돋음 AI 추론 서버
 
-FastAPI 기반 음성/영상 변환 서비스 (FreeVC + Wav2Lip)
+FastAPI로 Wav2Lip 립싱크 생성과 Omnilingual ASR 음성 인식을 제공하는 서버입니다. `PORT` 값에 따라 한 프로세스가 하나의 기능만 노출합니다.
 
-## 🚀 성능
+| `PORT` | 모드 | API |
+| --- | --- | --- |
+| `8000` | Wav2Lip | `POST /api/v1/lip-video` |
+| `8080` | STT | `POST /api/v1/stt/transcribe` |
 
-- **처리 시간**:
-  - GPU 모드: ~12초 (5초 영상 기준) 🚀
-  - CPU 모드: ~79초 (5초 영상 기준)
-- **최적화**: GPU 가속으로 **92% 성능 향상** ✅
-- **API**: RESTful HTTP 엔드포인트
-- **배포**: Google Compute Engine GPU VM 지원
+두 모드 모두 `GET /`와 `GET /health`를 제공합니다. `PORT`를 지정하지 않으면 Wav2Lip 모드로 실행됩니다.
 
-## 📊 주요 기능
+## 준비 사항
 
-- **TTS 생성**: gTTS를 사용한 텍스트 → 음성 변환
-- **FreeVC GPU**: 음성 스타일 변환 (CUDA 가속, 모델 캐싱 최적화)
-- **Wav2Lip GPU**: AI 기반 립싱크 영상 생성 (Static Face Detection 적용)
-- **GCS 연동**: Google Cloud Storage 파일 관리
-- **GCE GPU VM**: Google Compute Engine GPU 인스턴스 지원
+- Python 3.11과 Linux 또는 WSL2 환경
+- FFmpeg와 FFprobe
+- 입력·출력 파일을 저장할 Google Cloud Storage 버킷과 서비스 계정
+- Wav2Lip 모드: `models/Wav2Lip/checkpoints/wav2lip_gan.pth`
+- GPU 실행: 호환되는 NVIDIA 드라이버와 CUDA 런타임
 
----
+모델 체크포인트와 GCP 인증 파일은 저장소에 포함하지 않습니다.
 
-## 📋 빠른 시작
-
-### 0. 의존성 설치 (중요)
-
-**onnxruntime-gpu 설치** (InsightFace/SCRFD 사용 시 필수):
-
-CUDA 버전에 따라 적절한 인덱스를 사용하여 설치하세요:
+## 환경 설정
 
 ```bash
-# CUDA 12.x 사용 시 (권장)
-pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/
-
-# CUDA 11.x 사용 시
-pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
-
-# 또는 최신 버전 (자동 CUDA 감지)
-pip install onnxruntime-gpu
+cp .env.example .env
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-> **참고**: `requirements.txt`에 `onnxruntime-gpu`가 포함되어 있지 않습니다. CUDA 버전 호환성 문제로 인해 위 명령어로 별도 설치가 필요합니다.
+현재 의존성에는 Linux용 NVIDIA 패키지가 포함되어 있어 Windows 네이티브 실행은 검증하지 않았습니다. `.env`에는 다음 값이 필요합니다.
 
-### 1. 환경 변수 설정
-
-`.env` 파일 생성:
-
-```bash
+```dotenv
+PORT=8000
+DEBUG=false
 GCP_PROJECT_ID=your-project-id
 GCS_BUCKET=your-bucket-name
 GCS_CREDENTIAL_PATH=credentials/key.json
-DEBUG=false
 ```
 
-### 2. GPU 드라이버 설치 (필수)
+## 로컬 실행
+
+Wav2Lip 서버:
 
 ```bash
-# NVIDIA Docker 설치
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-
-sudo apt-get update
-sudo apt-get install -y nvidia-docker2
-sudo systemctl restart docker
-
-# GPU 확인
-nvidia-smi
+PORT=8000 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 3. Docker로 실행
+STT 서버:
 
 ```bash
-# GPU 모드 (권장)
-docker-compose up -d
-
-# CPU 모드 (GPU 없는 경우)
-docker-compose -f docker-compose.dev.yml up -d
+PORT=8080 uvicorn api.main:app --host 0.0.0.0 --port 8080
 ```
 
-### 4. API 호출
+PowerShell에서는 먼저 `$env:PORT = '8000'` 또는 `$env:PORT = '8080'`을 설정한 뒤 `uvicorn`을 실행합니다.
+
+## Docker 실행
+
+두 Compose 파일은 Wav2Lip 모드를 컨테이너의 8000번 포트에서 실행하고 호스트의 `http://localhost:8001`로 노출합니다. GPU 설정이 포함돼 있으므로 NVIDIA Container Toolkit이 준비된 환경을 전제로 합니다.
 
 ```bash
-# Health check
-curl http://localhost:8001/health
+docker compose -f docker-compose.dev.yml up --build
+docker compose up --build -d
+```
 
-# GPU 최적화 API 사용 (권장)
-curl -X POST http://localhost:8001/api/v1/lip-video-optimized \
+## 요청 예시
+
+립싱크 생성:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/lip-video \
   -H "Content-Type: application/json" \
   -d '{
-    "word": "안녕하세요",
-    "user_video_gs": "gs://bucket/input.mp4",
-    "output_video_gs": "gs://bucket/output.mp4",
-    "tts_lang": "ko"
+    "user_video_gs": "gs://your-bucket/input.mp4",
+    "gen_audio_gs": "gs://your-bucket/audio.wav",
+    "output_video_gs": "gs://your-bucket/output.mp4",
+    "word": "안녕하세요"
   }'
 ```
 
----
+`target_fps`를 생략하면 `word` 길이에 따라 15fps 또는 18fps를 사용합니다.
 
-## 🔥 GCE GPU VM 배포
-
-### 1. GPU VM 인스턴스 생성
+음성 인식:
 
 ```bash
-# GCP 프로젝트 설정
-export PROJECT_ID=your-project-id
-export ZONE=asia-northeast3-a  # 서울 리전
-export INSTANCE_NAME=serving-server-gpu
-
-# GPU VM 생성 (NVIDIA T4)
-gcloud compute instances create $INSTANCE_NAME \
-  --project=$PROJECT_ID \
-  --zone=$ZONE \
-  --machine-type=n1-standard-4 \
-  --accelerator=type=nvidia-tesla-t4,count=1 \
-  --image-family=ubuntu-2204-lts \
-  --image-project=ubuntu-os-cloud \
-  --boot-disk-size=100GB \
-  --boot-disk-type=pd-ssd \
-  --maintenance-policy=TERMINATE \
-  --metadata=install-nvidia-driver=True
-
-# SSH 접속
-gcloud compute ssh $INSTANCE_NAME --zone=$ZONE
-```
-
-### 2. VM에서 환경 설정
-
-```bash
-# NVIDIA Driver 자동 설치 확인 (약 5-10분 소요)
-sudo journalctl -u google-startup-scripts.service -f
-
-# GPU 확인
-nvidia-smi
-
-# Docker 설치
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-
-# NVIDIA Docker 설치
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-
-sudo apt-get update
-sudo apt-get install -y nvidia-docker2
-sudo systemctl restart docker
-
-# Docker GPU 테스트
-docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
-```
-
-### 3. 서비스 배포
-
-```bash
-# 프로젝트 클론
-git clone <your-repo-url>
-cd serving-server
-
-# 환경 변수 설정
-cat > .env << EOF
-GCP_PROJECT_ID=$PROJECT_ID
-GCS_BUCKET=your-bucket-name
-GCS_CREDENTIAL_PATH=credentials/key.json
-EOF
-
-# GCS 인증키 복사
-mkdir -p credentials
-# 로컬에서 key.json을 credentials/ 폴더에 업로드
-
-# Docker 빌드 및 실행
-docker-compose up -d --build
-
-# 로그 확인
-docker logs -f serving-server-gpu
-
-# 상태 확인
-curl http://localhost:8001/health
-```
-
-### 4. 외부 접속 설정 (선택사항)
-
-```bash
-# 방화벽 규칙 생성
-gcloud compute firewall-rules create allow-serving-server \
-  --project=$PROJECT_ID \
-  --direction=INGRESS \
-  --action=ALLOW \
-  --rules=tcp:8001 \
-  --source-ranges=0.0.0.0/0 \
-  --target-tags=serving-server
-
-# VM에 태그 추가
-gcloud compute instances add-tags $INSTANCE_NAME \
-  --zone=$ZONE \
-  --tags=serving-server
-
-# 외부 IP 확인
-gcloud compute instances describe $INSTANCE_NAME \
-  --zone=$ZONE \
-  --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
-
-# 외부에서 접속 테스트
-curl http://EXTERNAL_IP:8001/health
-```
-
----
-
-## 📁 프로젝트 구조
-
-```
-serving-server/
-├── api/
-│   ├── core/                      # 설정, 미들웨어, 로거
-│   ├── service/
-│   │   ├── freevc_optimized.py   # FreeVC 최적화 (NEW)
-│   │   ├── ai_service_optimized.py # 최적화 서비스 (NEW)
-│   │   └── ai_service.py          # 기존 서비스
-│   ├── routes/
-│   │   └── optimized.py           # 최적화 엔드포인트 (NEW)
-│   └── main.py                    # FastAPI 앱
-├── models/
-│   ├── FreeVC/                    # FreeVC 모델 및 스크립트
-│   └── Wav2Lip/                   # Wav2Lip 모델 및 스크립트
-├── Dockerfile                      # 프로덕션 Dockerfile
-├── Dockerfile.dev                  # 개발용 Dockerfile
-├── docker-compose.yml              # 프로덕션 Docker Compose
-├── docker-compose.dev.yml          # 개발용 Docker Compose
-├── requirements.txt                # Python 의존성
-├── test_optimization.py            # 최적화 테스트 (NEW)
-├── SERVING_OPTIMIZATION.md         # 상세 기술 문서 (NEW)
-├── OPTIMIZATION_SUMMARY.md         # 최적화 요약 (NEW)
-└── README.md                       # 이 파일
-```
-
----
-
-## 📡 API 엔드포인트
-
-### 기본 엔드포인트
-
-| Method | Path      | 설명                            |
-| ------ | --------- | ------------------------------- |
-| GET    | `/`       | 서버 상태 확인                  |
-| GET    | `/health` | 헬스 체크 (모델 파일 존재 여부) |
-
-### 립싱크 API
-
-| Method | Path                          | 설명       | 상태           |
-| ------ | ----------------------------- | ---------- | -------------- |
-| POST   | `/api/v1/lip-video`           | 기본 API   | ✅ 최적화 적용 |
-| POST   | `/api/v1/lip-video-optimized` | 최적화 API | ✅ 테스트용    |
-
-### 유틸리티
-
-| Method | Path                     | 설명           |
-| ------ | ------------------------ | -------------- |
-| POST   | `/api/v1/preload-models` | 모델 사전 로드 |
-
----
-
-## 🔧 개발 환경
-
-### 요구사항
-
-- Python 3.11+
-- Docker & Docker Compose
-- 8GB+ RAM (16GB 권장)
-- GCP 서비스 계정 (GCS 접근용)
-
-### 로컬 실행
-
-```bash
-# 가상환경
-python -m venv .venv
-source .venv/bin/activate
-
-# 패키지 설치 (uv 권장)
-pip install uv
-uv pip install -r requirements.txt
-
-# 서버 실행
-uvicorn api.main:app --reload
-```
-
----
-
-## 📊 성능 최적화
-
-### GPU 모드 (v3.0 - 최신)
-
-```
-전체: ~12초 (GPU T4 기준, 92% 향상!)
-  ├── Download: 0.8s (6.7%)
-  ├── Audio+TTS: 0.5s (4.2%)
-  ├── FreeVC GPU: 2.0s (16.7%) ← CUDA 가속!
-  └── Wav2Lip GPU: 8.7s (72.5%) ← Static Face + GPU!
-```
-
-### CPU 모드 (v2.0)
-
-```
-전체: 78.81초 (48% 향상)
-  ├── Download: 0.83s (1.1%)
-  ├── Audio+TTS: 0.47s (0.6%)
-  ├── FreeVC: 3.03s (3.8%)
-  └── Wav2Lip: 67.17s (85.2%)
-```
-
-### 주요 최적화
-
-- ✅ **GPU 가속** (CUDA 11.8 + cuDNN 8)
-  - FreeVC: CPU 15s → GPU 2s (87% 개선)
-  - Wav2Lip: CPU 136s → GPU 9s (93% 개선)
-- ✅ **Static Face Detection** (첫 프레임만 탐지)
-  - Face detection: 120s → 5s (96% 개선)
-- ✅ **모델 사전 로드** (캐싱)
-  - 첫 요청 후 재사용으로 로딩 시간 0초
-- ✅ **배치 크기 자동 조정**
-  - GPU 메모리에 따라 최적 배치 크기 자동 설정
-
-자세한 내용: [SERVING_OPTIMIZATION.md](./SERVING_OPTIMIZATION.md)
-
----
-
-## 🧪 테스트
-
-### 자동화 테스트
-
-```bash
-# Docker 컨테이너 내부
-docker exec serving-server-dev python /app/test_optimization.py
-
-# 예상 출력:
-# Model Loading                  ✅ PASS
-# Service Integration            ✅ PASS
-# 🎉 All tests passed!
-```
-
-### API 테스트
-
-```bash
-# 모델 사전 로드
-curl -X POST http://localhost:8001/api/v1/preload-models
-
-# API 호출
-curl -X POST http://localhost:8001/api/v1/lip-video-optimized \
+curl -X POST http://localhost:8080/api/v1/stt/transcribe \
   -H "Content-Type: application/json" \
   -d '{
-    "word": "테스트",
-    "user_video_gs": "gs://bucket/input.mp4",
-    "output_video_gs": "gs://bucket/output.mp4",
-    "tts_lang": "ko"
+    "audio_gs": "gs://your-bucket/audio.wav",
+    "lang": "kor_Hang",
+    "model_size": "300M"
   }'
 ```
 
----
+`audio_gs` 대신 서버가 접근할 수 있는 `audio_url`을 보낼 수 있습니다.
 
-## 🔧 Docker 설정
+## 검증
 
-### 개발 환경
-
-```bash
-# 빌드 및 실행
-docker-compose -f docker-compose.dev.yml up -d
-
-# 로그 확인
-docker logs serving-server-dev -f
-
-# 컨테이너 접속
-docker exec -it serving-server-dev bash
-```
-
-### 프로덕션 환경
+현재 추론 모델을 포함한 자동화 테스트는 제공하지 않습니다. 모델 없이 실행 가능한 최소 정적 검사는 다음과 같습니다.
 
 ```bash
-# 빌드 및 실행
-docker-compose up -d --build
-
-# 스케일링
-docker-compose up -d --scale serving-server=3
+python -m compileall api
 ```
 
----
+실제 동작 검증에는 GCS 인증 정보와 모델 체크포인트가 필요합니다. Wav2Lip 모드의 `/health` 응답이 `warning`이면 체크포인트 경로를 확인하세요.
 
-## 📚 문서
+## 외부 코드와 사용 조건
 
-- **[OPTIMIZATION_SUMMARY.md](./OPTIMIZATION_SUMMARY.md)** - 최적화 완료 리포트 ⭐
-- **[SERVING_OPTIMIZATION.md](./SERVING_OPTIMIZATION.md)** - 상세 기술 문서
-- **[test_optimization.py](./test_optimization.py)** - 테스트 스크립트
-
----
-
-## 🎯 향후 최적화 가능성
-
-1. **모델 양자화** (목표: 12s → 8s)
-
-   - INT8/FP16 양자화
-   - TensorRT 최적화
-   - 예상 개선: 30-40%
-
-2. **병렬 처리 강화**
-   - 멀티 GPU 지원
-   - 배치 처리 최적화
-
-자세한 내용: [OPTIMIZATION_SUMMARY.md](./OPTIMIZATION_SUMMARY.md)
-
----
-
-## 🐛 문제 해결
-
-### Wav2Lip 모델 파일 없음
-
-```bash
-cd models/Wav2Lip/checkpoints
-wget "https://github.com/Rudrabha/Wav2Lip/releases/download/models/wav2lip_gan.pth" -O Wav2Lip_gan.pth
-```
-
-### 메모리 부족 (OOM)
-
-```yaml
-# docker-compose.yml
-deploy:
-  resources:
-    limits:
-      memory: 12G # 8G → 12G
-```
-
-### numba/torch 경고 로그
-
-```
-✅ 이미 억제 처리됨 (api/core/logger.py)
-```
-
----
-
-## 📞 기술 지원
-
-- **문서**: `SERVING_OPTIMIZATION.md`, `OPTIMIZATION_SUMMARY.md`
-- **테스트**: `test_optimization.py`
-- **이슈**: 프로젝트 이슈 트래커
-
----
-
-## 📄 라이선스
-
-- FreeVC: MIT License
-- Wav2Lip: 원본 라이선스 참조
-
----
-
-**Last Updated**: 2025-11-04  
-**Version**: v3.0 (GPU Optimized)  
-**Status**: ✅ GPU Production Ready | GCE Compatible
+`models/Wav2Lip`은 Wav2Lip 기반 코드입니다. 원본 프로젝트의 안내에 비상업적·연구·개인 목적 사용 제한이 명시돼 있으므로 배포 또는 상업적 이용 전에 `models/Wav2Lip/README.md`의 조건과 원 저작권을 확인해야 합니다.

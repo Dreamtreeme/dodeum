@@ -1,15 +1,11 @@
 .env
-env.example
-.env.example
+.env.*
+!.env.example
 .venv/
 __pycache__/
-
-# Test files
-tests/
 
 # Credentials
 credentials/
 
-# Optimization test files
-test_optimization.py
+# Local backup modules
 *_backup.py
